@@ -86,3 +86,26 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
   pointer-events: none;
 }
+
+.data-toggle {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  display: flex;
+  gap: 8px;
+}
+
+.data-toggle button {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.data-toggle button.active {
+  background: #007aff;
+  color: white;
+  border-color: #007aff;
+}
