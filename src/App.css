@@ -1,0 +1,88 @@
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+.container {
+  height: 100%;
+  display: flex;
+  overflow: hidden;
+  justify-content: center;
+  align-items: center;
+  gap: 24px; /* the gap between window & label */
+}
+
+.labelBox {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px; /* the gap between "now" / "nxt" */
+  transform: translateY(20px);
+}
+
+.label {
+  font-size: 18px;
+  font-weight: 500;
+  color: #555;
+  user-select: none;
+}
+
+.label.clickable {
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.label.clickable {
+  cursor: pointer;
+  padding: 3px 12px;
+  border-radius: 15px;
+  transition: 0.2s ease, transform 0.15s ease;
+}
+
+.label.clickable:hover {
+  background: rgba(0, 122, 255, 0.08);
+}
+
+.label.clickable:active {
+  transform: scale(0.94);
+}
+.window {
+  position: relative;
+  width: 250px;
+  height: 200px;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.item {
+  position: absolute;
+  height: 40px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: all 0.25s ease;
+  font-size: 20px;
+  font-weight: 500;
+  color: #333;
+  user-select: none;
+}
+
+.highlight {
+  position: absolute;
+  height: 40px;
+  width: 90%;
+  border-radius: 17px;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 122, 255, 0.1),
+    rgba(0, 122, 255, 0.08)
+  );
+  backdrop-filter: blur(4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+  pointer-events: none;
+}
