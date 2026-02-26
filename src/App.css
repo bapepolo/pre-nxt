@@ -1,17 +1,85 @@
+:root {
+  --highlight-height: 40px;
+}
+
 #root {
-  max-width: 1280px;
   margin: 0 auto;
-  padding: 2rem;
+  padding: 0;
   text-align: center;
 }
 
 .container {
+  position: relative;
   height: 100%;
   display: flex;
-  overflow: hidden;
   justify-content: center;
   align-items: center;
   gap: 24px; /* the gap between window & label */
+}
+
+.container:fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  padding: 0;
+  background: #fff;
+}
+
+.container.fullscreen .window {
+  width: 750px;
+  height: 600px;
+}
+
+.container.fullscreen .highlight {
+  height: calc(var(--highlight-height) * 2);
+  border-radius: 34px;
+}
+
+.container.fullscreen .item {
+  font-size: 50px;
+}
+
+.container.fullscreen .labelBox {
+  gap: 33px;
+}
+
+.container.fullscreen .label {
+  font-size: 35px;
+}
+
+.container.fullscreen .label.clickable {
+  border-radius: 25px;
+}
+
+.fullscreen-btn {
+  width: 40px;
+  height: 40px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 10px;
+  border: 1px solid #ddd;
+  background: white;
+
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.fullscreen-btn svg {
+  width: 100%;
+  height: 100%;
+}
+
+.fullscreen-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.fullscreen-btn:active {
+  transform: scale(0.92);
 }
 
 .labelBox {
@@ -19,7 +87,6 @@
   flex-direction: column;
   justify-content: center;
   gap: 10px; /* the gap between "now" / "nxt" */
-  transform: translateY(20px);
 }
 
 .label {
@@ -48,6 +115,7 @@
 .label.clickable:active {
   transform: scale(0.94);
 }
+
 .window {
   position: relative;
   width: 250px;
@@ -58,23 +126,134 @@
   align-items: center;
 }
 
+.click-zone {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 50%;
+  z-index: 200;
+  cursor: pointer;
+}
+
+.click-zone.up {
+  top: 0;
+  height: calc(50% - var(--highlight-height) / 2);
+}
+
+.click-zone.down {
+  bottom: 0;
+  height: calc(50% - var(--highlight-height) / 2);
+}
+
+.scroll-top-button {
+  position: absolute;
+  top: -60px;
+  left: 50%;
+  transform: translate(50%, -10px);
+  z-index: 200;
+
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+
+  border: 1px solid #ddd;
+  background: white;
+  color: rgba(0, 0, 0, 0.8);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+
+  font-size: 18px;
+  cursor: pointer;
+  user-select: none;
+
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.2s ease;
+}
+
+.scroll-top-button.show {
+  transform: translate(50%, 0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.scroll-top-button:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.scroll-top-button:active {
+  transform: translate(50%, -50%) scale(0.9);
+}
+
 .item {
   position: absolute;
-  height: 40px;
+  height: 50px;
   width: 100%;
   display: flex;
   justify-content: center;
   align-items: center;
-  transition: all 0.25s ease;
+  transition: transform 0.25s ease, opacity 0.25s ease;
   font-size: 20px;
   font-weight: 500;
   color: #333;
   user-select: none;
 }
 
+.item.active {
+  color: #000;
+  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+  font-weight: 600;
+}
+
+.text-wrapper {
+  overflow: hidden;
+  width: 80%;
+
+  /* fadeout */
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    black 8%,
+    black 92%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    black 8%,
+    black 92%,
+    transparent 100%
+  );
+}
+
+.text-content {
+  white-space: nowrap;
+  display: inline-block;
+  transition: all 0.25s ease;
+}
+
+.scrolling {
+  animation: marquee var(--scroll-duration) 
+             cubic-bezier(0.65, 0, 0.35, 1) 
+             infinite alternate;
+             
+  animation-delay: 0.5s;
+}
+
+@keyframes marquee {
+  0%   { transform: translateX(var(--scroll-start)); }
+  5%   { transform: translateX(var(--scroll-start)); }
+
+  45%  { transform: translateX(var(--scroll-end)); }
+
+  55%  { transform: translateX(var(--scroll-end)); }
+
+  95% { transform: translateX(var(--scroll-start)); }
+  100% { transform: translateX(var(--scroll-start)); }
+}
+
 .highlight {
   position: absolute;
-  height: 40px;
+  height: var(--highlight-height);
   width: 90%;
   border-radius: 17px;
   background: linear-gradient(
@@ -87,15 +266,22 @@
   pointer-events: none;
 }
 
-.data-toggle {
+.control-panel {
   position: absolute;
   top: 16px;
   left: 16px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.source-row {
   display: flex;
   gap: 8px;
 }
 
-.data-toggle button {
+.control-panel button {
   padding: 6px 12px;
   border-radius: 8px;
   border: 1px solid #ddd;
@@ -104,7 +290,7 @@
   transition: all 0.2s ease;
 }
 
-.data-toggle button.active {
+.control-panel button.active {
   background: #007aff;
   color: white;
   border-color: #007aff;

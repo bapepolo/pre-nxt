@@ -1,10 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import './App.css'
 import { getPeople } from './peopleService';
+import { EnterIcon } from './fullScreenUi';
+import PickerItem from './Item';
+import GoToTopIcon from './goToTopUi';
 
 function App() {
-  const [source, setSource] = useState<"local" | "google">("google");
+  const [source, setSource] = useState<"local" | "google">("local");
   const [people, setPeople] = useState<{id: string, name: string}[]>([]);
+  const [selectedDate, setSelectedDate] = useState<string>("2024-02-26");
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     getPeople(source).then(setPeople);
@@ -47,10 +53,18 @@ function App() {
         e.preventDefault();
         moveDown();
       }
+      if (
+        e.key.toLowerCase() === "u" &&
+        !(e.target instanceof HTMLInputElement) &&
+        !(e.target instanceof HTMLTextAreaElement)
+      ) {
+        e.preventDefault();
+        setSelectedIndex(0);
+      }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [people.length]);
+  }, [people.length, selectedIndex]);
 
   // mouse wheel
   const handleWheel = (e: React.WheelEvent) => {
@@ -73,68 +87,127 @@ function App() {
     startY.current = null;
   };
 
+  const toggleFullscreen = async () => {
+    if (!document.fullscreenElement) {
+      await containerRef.current?.requestFullscreen();
+    } else {
+      await document.exitFullscreen();
+    }
+  };
+
+  useEffect(() => {
+    const handler = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener("fullscreenchange", handler);
+    return () => document.removeEventListener("fullscreenchange", handler);
+  }, []);
+
   return (
     <>
-      <div className="data-toggle">
+      <div className="control-panel">
+        <div className="source-row">
+          <button
+            className={source === "local" ? "active" : ""}
+            onClick={() => setSource("local")}
+          >
+            Local
+          </button>
+
+          <button
+            className={source === "google" ? "active" : ""}
+            onClick={() => setSource("google")}
+          >
+            Google
+          </button>
+        </div>
+
         <button
-          className={source === "local" ? "active" : ""}
-          onClick={() => setSource("local")}
+          className="fullscreen-btn"
+          title='전체화면'
+          onClick={toggleFullscreen}
         >
-          Local
-        </button>
-        <button
-          className={source === "google" ? "active" : ""}
-          onClick={() => setSource("google")}
-        >
-          Google
+          <EnterIcon />
         </button>
       </div>
-
+      
       <div
-        className="container"
+        ref={containerRef}
+        className={`container ${isFullscreen ? "fullscreen" : ""}`}
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         onMouseUp={handleMouseUp}
       >
+        {!isFullscreen && (
+          <button
+            className={`scroll-top-button ${selectedIndex > 0 ? "show" : ""}`}
+            onClick={() => setSelectedIndex(0)}
+          >
+            <GoToTopIcon />
+          </button>
+        )}
+
         <div className="labelBox">
-          <div className="label">현재</div>
-          <div 
+          <div
             className="label clickable"
-            onClick={moveDown}
+            onClick={selectedIndex !== 0 ? moveUp : undefined}
             style={{
-              color: "#999"
-          }}>
+              color: selectedIndex === 0 ? "transparent" : "#999",
+              visibility: selectedIndex === 0 ? "hidden" : "visible",
+              pointerEvents: selectedIndex === 0 ? "none" : "auto"
+            }}
+          >
+            이전
+          </div>
+
+          <div className="label">현재</div>
+
+          <div
+            className="label clickable"
+            onClick={
+              selectedIndex !== people.length - 1 ? moveDown : undefined
+            }
+            style={{
+              color:
+                selectedIndex === people.length - 1
+                  ? "transparent"
+                  : "#999",
+              visibility:
+                selectedIndex === people.length - 1
+                  ? "hidden"
+                  : "visible",
+              pointerEvents:
+                selectedIndex === people.length - 1
+                  ? "none"
+                  : "auto"
+            }}
+          >
             다음
           </div>
         </div>
 
-
         <div className="window">
-          {people.map((person, index) => {
-            const distance = index - selectedIndex;
-            const absDistance = Math.abs(distance);
+          <div
+            className="click-zone up"
+            onClick={moveUp}
+          />
 
-            const scale = 1 - absDistance * 0.15;
-            const opacity = 1 - absDistance * 0.3;
-            const isActive = index === selectedIndex;
+          <div
+            className="click-zone down"
+            onClick={moveDown}
+          />
 
-            return (
-              <div
-                key={index}
-                className="item"
-                style={{
-                  transform: `translateY(${distance * 40}px) scale(${scale})`,
-                  opacity: opacity < 0 ? 0 : opacity,
-                  zIndex: 100 - absDistance,
-                  color: isActive ? "#000" : "#555",
-                  fontWeight: isActive ? 600 : 400,
-                }}
-              >
-                {person.id} {person.name}
-              </div>
-            );
-          })}
-
+          {people.map((person, index) => (
+            <PickerItem
+              key={person.id}
+              title={`${person.id} ${person.name}`}
+              text={`${person.id} ${person.name}`}
+              isActive={index === selectedIndex}
+              distance={index - selectedIndex}
+              isFullscreen={isFullscreen}
+            />
+          ))}
           <div className="highlight" />
         </div>
       </div>
