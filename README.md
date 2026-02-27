@@ -11,7 +11,7 @@ cost**, and **clean theme-aware UI design**.
 
 Deployed on Vercel:
 
-👉 https://pre-nxt01.vercel.app/
+👉 https://pre-nxt.vercel.app/
 
 ------------------------------------------------------------------------
 
