@@ -3,6 +3,11 @@ const GOOGLE_URL =
 
 async function parseCSV(url: string) {
   const res = await fetch(url);
+
+  if (!res.ok) {
+    throw new Error("CSV fetch 실패");
+  }
+
   const text = await res.text();
 
   return text
@@ -23,14 +28,23 @@ export async function getPeopleFromLocal() {
   return parseCSV("/people.csv");
 }
 
-export async function getPeopleFromGoogle() {
-  return parseCSV(GOOGLE_URL);
+export async function getPeopleFromGoogle(url: string) {
+  return parseCSV(url);
 }
 
 export type DataSource = "local" | "google";
 
-export async function getPeople(source: DataSource) {
-  return source === "local"
-    ? getPeopleFromLocal()
-    : getPeopleFromGoogle();
+export async function getPeople(
+  source: DataSource,
+  googleUrl?: string,
+) {
+  if (source === "local") {
+    return getPeopleFromLocal();
+  }
+
+  if (!googleUrl) {
+    throw new Error("Google URL이 필요합니다.");
+  }
+
+  return getPeopleFromGoogle(googleUrl);
 }

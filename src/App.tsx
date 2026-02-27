@@ -1,22 +1,70 @@
 import { useEffect, useRef, useState } from 'react';
 import './App.css'
-import { getPeople } from './peopleService';
-import { EnterIcon } from './fullScreenUi';
+import { getPeopleFromGoogle, getPeopleFromLocal, type DataSource } from './services/peopleService';
+import { EnterIcon } from './icons/fullScreenIcon';
 import PickerItem from './Item';
-import GoToTopIcon from './goToTopUi';
+import GoToTopIcon from './icons/goToTopIcon';
+import { useGoogleCsv } from './hooks/useGoogleCsv';
+import { loadPersistedState, useAppPersist } from './hooks/useAppPersist';
+import { MoonIcon, SunIcon, SystemIcon } from './icons/darkModeIcon';
 
 function App() {
-  const [source, setSource] = useState<"local" | "google">("local");
+  // const [source, setSource] = useState<"local" | "google">("google");
   const [people, setPeople] = useState<{id: string, name: string}[]>([]);
-  const [selectedDate, setSelectedDate] = useState<string>("2024-02-26");
+  const [selectedSheet, setSelectedSheet] = useState<string>("2024-02-26");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    getPeople(source).then(setPeople);
-  }, [source]);
+  const persisted = loadPersistedState();
 
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [dataSource, setDataSource] = useState<DataSource>(
+    persisted?.dataSource ?? "local"
+  );
+
+  const [darkMode, setDarkMode] = useState(
+    persisted?.darkMode ?? false
+  );
+  const [useSystemTheme, setUseSystemTheme] = useState(
+    persisted?.useSystemTheme ?? true
+  );
+
+  const [selectedIndex, setSelectedIndex] = useState(
+    persisted?.selectedIndex ?? 0
+  );
+
+  const {
+    url: googleUrl,
+    setUrl: setGoogleUrl,
+    error,
+    isLoading,
+    load
+  } = useGoogleCsv(persisted?.googleUrl ?? "");
+
+  useAppPersist({
+    dataSource,
+    googleUrl,
+    darkMode,
+    useSystemTheme,
+    selectedIndex
+  });
+
+  // Data fetch
+  useEffect(() => {
+    if (dataSource === "local") {
+      getPeopleFromLocal().then(setPeople);
+    } else if (dataSource === "google" && googleUrl) {
+      getPeopleFromGoogle(googleUrl).then(setPeople);
+    }
+  }, [dataSource, googleUrl]);
+
+  const handleLoad = async () => {
+    const data = await load();
+    if (data) {
+      setPeople(data);
+      setSelectedIndex(0);
+    }
+  };
+
   const startY = useRef<number | null>(null);
 
   // prevent index overflow
@@ -61,6 +109,20 @@ function App() {
         e.preventDefault();
         setSelectedIndex(0);
       }
+      if (
+        e.key.toLowerCase() === "f" &&
+        !(e.target instanceof HTMLInputElement) &&
+        !(e.target instanceof HTMLTextAreaElement)
+      ) {
+        toggleFullscreen();
+      }
+      if (
+        e.key.toLowerCase() === "d" &&
+        !(e.target instanceof HTMLInputElement) &&
+        !(e.target instanceof HTMLTextAreaElement)
+      ) {
+        toggleDarkMode();
+      }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
@@ -87,6 +149,8 @@ function App() {
     startY.current = null;
   };
 
+
+  // Full Screen
   const toggleFullscreen = async () => {
     if (!document.fullscreenElement) {
       await containerRef.current?.requestFullscreen();
@@ -104,24 +168,89 @@ function App() {
     return () => document.removeEventListener("fullscreenchange", handler);
   }, []);
 
+
+  // Dark Mode
+  const toggleDarkMode = () => {
+    setUseSystemTheme(false);
+    setDarkMode(prev => !prev);
+  }
+
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+
+    const applyTheme = () => {
+      const shouldDark = useSystemTheme
+        ? media.matches
+        : darkMode;
+
+      document.body.classList.toggle("dark", shouldDark);
+      setDarkMode(shouldDark);
+    };
+
+    applyTheme();
+
+    if (useSystemTheme) {
+      media.addEventListener("change", applyTheme);
+    }
+
+    return () => {
+      media.removeEventListener("change", applyTheme);
+    };
+  }, [darkMode, useSystemTheme]);
+
   return (
     <>
-      <div className="control-panel">
+      <div className="panel left">
         <div className="source-row">
           <button
-            className={source === "local" ? "active" : ""}
-            onClick={() => setSource("local")}
+            className={dataSource === "local" ? "active" : ""}
+            onClick={() => {setDataSource("local"); setSelectedIndex(0);}}
           >
             Local
           </button>
 
           <button
-            className={source === "google" ? "active" : ""}
-            onClick={() => setSource("google")}
+            className={dataSource === "google" ? "active" : ""}
+            onClick={() => {setDataSource("google"); setSelectedIndex(0);}}
           >
             Google
           </button>
         </div>
+
+        {dataSource === "google" && (
+          <div className="sheet-input-wrapper">
+            <input
+              value={googleUrl}
+              onChange={(e) => setGoogleUrl(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleLoad();
+              }}
+            />
+
+            <button onClick={handleLoad} disabled={isLoading}>
+              {isLoading ? "로딩..." : "불러오기"}
+            </button>
+
+            {error && <span className="error-text">{error}</span>}
+          </div>
+        )}
+      </div>
+
+      <div className='panel right'>
+        <button
+          onClick={toggleDarkMode}
+          title={`다크모드: ${darkMode ? "dark" : "light"}`}
+        >
+          {darkMode ? <MoonIcon /> : <SunIcon />}
+        </button>
+
+        <button
+          className={useSystemTheme ? "active" : ""}
+          title="다크모드: system"
+          onClick={() => setUseSystemTheme(prev => !prev)}
+        >
+          <SystemIcon />
+        </button>
 
         <button
           className="fullscreen-btn"
@@ -150,13 +279,10 @@ function App() {
 
         <div className="labelBox">
           <div
-            className="label clickable"
+            className={`label clickable ${
+              selectedIndex === 0 ? "disabled" : ""
+            }`}
             onClick={selectedIndex !== 0 ? moveUp : undefined}
-            style={{
-              color: selectedIndex === 0 ? "transparent" : "#999",
-              visibility: selectedIndex === 0 ? "hidden" : "visible",
-              pointerEvents: selectedIndex === 0 ? "none" : "auto"
-            }}
           >
             이전
           </div>
@@ -164,24 +290,12 @@ function App() {
           <div className="label">현재</div>
 
           <div
-            className="label clickable"
+            className={`label clickable ${
+              selectedIndex === people.length - 1 ? "disabled" : ""
+            }`}
             onClick={
               selectedIndex !== people.length - 1 ? moveDown : undefined
             }
-            style={{
-              color:
-                selectedIndex === people.length - 1
-                  ? "transparent"
-                  : "#999",
-              visibility:
-                selectedIndex === people.length - 1
-                  ? "hidden"
-                  : "visible",
-              pointerEvents:
-                selectedIndex === people.length - 1
-                  ? "none"
-                  : "auto"
-            }}
           >
             다음
           </div>
