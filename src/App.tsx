@@ -9,9 +9,8 @@ import { loadPersistedState, useAppPersist } from './hooks/useAppPersist';
 import { MoonIcon, SunIcon, SystemIcon } from './icons/darkModeIcon';
 
 function App() {
-  // const [source, setSource] = useState<"local" | "google">("google");
   const [people, setPeople] = useState<{id: string, name: string}[]>([]);
-  const [selectedSheet, setSelectedSheet] = useState<string>("2024-02-26");
+  // const [selectedSheet, setSelectedSheet] = useState<string>("2024-02-26");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
