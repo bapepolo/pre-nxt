@@ -5,6 +5,8 @@ const STORAGE_KEY = "dbSelectionAppState";
 export type PersistedAppState = {
   dataSource: "local" | "google";
   googleUrl: string;
+  isFullscreen: boolean;
+  uiScale: number;
   darkMode: boolean;
   useSystemTheme: boolean;
   selectedIndex: number;

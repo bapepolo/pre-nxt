@@ -5,13 +5,15 @@ function PickerItem({
   text,
   isActive,
   distance,
-  isFullscreen
+  isFullscreen,
+  uiScale
 }: {
   title: string;
   text: string;
   isActive: boolean;
   distance: number;
   isFullscreen: boolean;
+  uiScale:number;
 }) {
   const textRef = useRef<HTMLDivElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -22,7 +24,7 @@ function PickerItem({
   const scale = 1 - absDistance * 0.15;
   const opacity = 1 - absDistance * 0.3;
 
-  const itemHeight = isFullscreen ? 90 : 40;
+  const itemHeight = isFullscreen ? 90 * uiScale : 40;
 
   useEffect(() => {
     const wrapper = wrapperRef.current;

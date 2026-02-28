@@ -1,21 +1,33 @@
 import { useEffect, useRef, useState } from 'react';
 import './App.css'
 import { getPeopleFromGoogle, getPeopleFromLocal, type DataSource } from './services/peopleService';
-import { EnterIcon } from './icons/fullScreenIcon';
+import { CloseIcon, EnterIcon } from './icons/fullScreenIcon';
 import PickerItem from './Item';
 import GoToTopIcon from './icons/goToTopIcon';
 import { useGoogleCsv } from './hooks/useGoogleCsv';
 import { loadPersistedState, useAppPersist } from './hooks/useAppPersist';
 import { MoonIcon, SunIcon, SystemIcon } from './icons/darkModeIcon';
+import toast, { Toaster } from 'react-hot-toast';
 
 function App() {
   const [people, setPeople] = useState<{id: string, name: string}[]>([]);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [showScale, setShowScale] = useState(false);
   // const [selectedSheet, setSelectedSheet] = useState<string>("2024-02-26");
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-
+  const longPressTimer =useRef<number | null>(null);
+  const scaleHideTimer = useRef<number | null>(null);
+  
   const persisted = loadPersistedState();
 
+  const [isFullscreen, setIsFullscreen] = useState(
+    persisted?.isFullscreen ?? false
+  );
+
+  const [uiScale, setUiScale] = useState(
+    persisted?.uiScale ?? 1
+  );
+  
   const [dataSource, setDataSource] = useState<DataSource>(
     persisted?.dataSource ?? "local"
   );
@@ -42,6 +54,8 @@ function App() {
   useAppPersist({
     dataSource,
     googleUrl,
+    isFullscreen,
+    uiScale,
     darkMode,
     useSystemTheme,
     selectedIndex
@@ -122,10 +136,55 @@ function App() {
       ) {
         toggleDarkMode();
       }
+      if (
+        isFullscreen &&
+        e.code === "Comma" &&
+        !(e.target instanceof HTMLInputElement) &&
+        !(e.target instanceof HTMLTextAreaElement)
+      ) {
+        setUiScale(prev => {
+          const next = clampSlider(prev - 0.05);
+          showScaleToast(next);
+          return next;
+        });
+      }
+      if (
+        isFullscreen &&
+        e.code === "Period" &&
+        !(e.target instanceof HTMLInputElement) &&
+        !(e.target instanceof HTMLTextAreaElement)
+      ) {
+        setUiScale(prev => {
+          const next = clampSlider(prev + 0.05);
+          showScaleToast(next);
+          return next;
+        });
+      }
+      if (
+        e.key.toLowerCase() === "n" &&
+        !(e.target instanceof HTMLInputElement) &&
+        !(e.target instanceof HTMLTextAreaElement)
+      ) {
+        setUiScale(1);
+        showScaleToast(1);
+      }
+      if (
+        e.key.toLowerCase() === "h" &&
+        !(e.target instanceof HTMLInputElement) &&
+        !(e.target instanceof HTMLTextAreaElement)
+      ) {
+        setIsHelpOpen(true);
+      }
+      if (
+        isHelpOpen &&
+        e.code === "Escape"
+      ) {
+        setIsHelpOpen(false);
+      }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [people.length, selectedIndex]);
+  }, [people.length, selectedIndex, isFullscreen]);
 
   // mouse wheel
   const handleWheel = (e: React.WheelEvent) => {
@@ -168,11 +227,62 @@ function App() {
   }, []);
 
 
+  // Scale UI
+  useEffect(() => {
+    document.documentElement.style.setProperty(
+      "--ui-scale",
+      uiScale.toString()
+    );
+  }, [uiScale]);
+
+  const clampSlider = (value: number) => {
+    if (value > 2) return 2;
+    if (value < 0.5) return 0.5;
+    return value;
+  };
+
+  const handleScaleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const offset = rect.bottom - e.clientY;
+    const percent = offset / rect.height;
+
+    const newScale = Math.round((0.5 + percent * (2 - 0.5))*10)/10; // min=0.5, max=2, step=0.1
+
+    setUiScale(clampSlider(newScale));
+  };
+
+  const showScaleToast = (uiScale: number) => {
+    toast.custom((t) => (
+      <div className={`toast-scale ${t.visible ? "enter" : "leave"}`}>
+        <div className="toast-scale__label">UI SCALE</div>
+        <div className="toast-scale__value">⨉{uiScale.toFixed(1)}</div>
+      </div>
+    ), { id: "toast-scale" });
+  }
+
+  function startScaleHideTimer() {
+    if (scaleHideTimer.current) clearTimeout(scaleHideTimer.current);
+
+    scaleHideTimer.current = window.setTimeout(() => {
+      setShowScale(false);
+    }, 3000);
+  }
+
+  useEffect(() => {
+    if (!showScale) return;
+
+    startScaleHideTimer();
+
+    return () => {
+      if (scaleHideTimer.current) clearTimeout(scaleHideTimer.current);
+    };
+  }, [showScale]);
+
   // Dark Mode
   const toggleDarkMode = () => {
     setUseSystemTheme(false);
     setDarkMode(prev => !prev);
-  }
+  };
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
@@ -236,37 +346,146 @@ function App() {
       </div>
 
       <div className='panel right'>
-        <button
-          onClick={toggleDarkMode}
-          title={`다크모드: ${darkMode ? "dark" : "light"}`}
+        <div className='source-row'>
+          <button
+            onClick={toggleDarkMode}
+            title={`다크모드: ${darkMode ? "dark" : "light"}`}
+          >
+            <div className={`icon ${darkMode ? "" : "close"}`}>
+              {darkMode ? <MoonIcon /> : <SunIcon />}
+            </div>
+          </button>
+
+          <button
+            className={useSystemTheme ? "active" : ""}
+            title="다크모드: system"
+            onClick={() => setUseSystemTheme(prev => !prev)}
+          >
+            <SystemIcon />
+          </button>
+
+          <button
+            className="fullscreen-btn"
+            title={`전체화면(${Math.round(uiScale * 10)/10}배)`}
+            onMouseDown={() => {
+              longPressTimer.current = window.setTimeout(() => {
+                setShowScale(true);
+              }, 400);
+            }}
+            onMouseUp={() => {
+              if (longPressTimer.current) {
+                clearTimeout(longPressTimer.current);
+              };
+            }}
+            onClick={() => {
+              if (!showScale) toggleFullscreen();
+              else setShowScale(false);
+            }}
+          >
+            <div className={`icon ${showScale ? "close" : ""}`}>
+              {showScale ? <CloseIcon /> : <EnterIcon />}
+            </div>
+          </button>
+        </div>
+
+        <div 
+          className={`scale-pill ${showScale ? "open" : ""}`}
+          title={`값: ${Math.round(uiScale*10)/10}`}
+          onClick={handleScaleClick}
+          onMouseMove={(e) => {
+            e.preventDefault();
+            if (e.buttons === 1) handleScaleClick(e);
+          }}
+          onMouseEnter={() => {
+            if (scaleHideTimer.current) clearTimeout(scaleHideTimer.current);
+          }}
+          onMouseLeave={() => startScaleHideTimer()}
         >
-          {darkMode ? <MoonIcon /> : <SunIcon />}
-        </button>
+          <div
+            className="scale-fill"
+            style={{ height: `${(uiScale - 0.5) / (2 - 0.5) * 100}%` }}
+          />
+
+          <div 
+            className='scale-marker'
+            title='1.0'
+            onClick={(e) => {
+              e.stopPropagation();
+              showScaleToast(1);
+              setUiScale(1);
+            }}
+          />
+        </div>
 
         <button
-          className={useSystemTheme ? "active" : ""}
-          title="다크모드: system"
-          onClick={() => setUseSystemTheme(prev => !prev)}
+          className="help-button"
+          onClick={() => setIsHelpOpen(true)}
         >
-          <SystemIcon />
-        </button>
-
-        <button
-          className="fullscreen-btn"
-          title='전체화면'
-          onClick={toggleFullscreen}
-        >
-          <EnterIcon />
+          ?
         </button>
       </div>
+
+      {isHelpOpen && (
+        <div className="help-modal__overlay" onClick={() => setIsHelpOpen(false)}>
+          <div
+            className="help-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="help-modal__header">
+              <h2>Keyboard Guide</h2>
+              <button
+                className="help-close"
+                onClick={() => setIsHelpOpen(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="help-modal__content">
+              <div className="help-modal__shortcut">
+                <span className="help-modal__key">↑ ↓</span>
+                <span className="help-modal__desc">Move selection</span>
+              </div>
+              <div className="help-modal__shortcut">
+                <span className="help-modal__key">F</span>
+                <span className="help-modal__desc">Toggle Fullscreen</span>
+              </div>
+              <div className="help-modal__shortcut">
+                <span className="help-modal__key">D</span>
+                <span className="help-modal__desc">Toggle Dark Mode</span>
+              </div>
+              <div className="help-modal__shortcut">
+                <span className="help-modal__key">, / .</span>
+                <span className="help-modal__desc">Adjust UI Scale</span>
+              </div>
+              <div className="help-modal__shortcut">
+                <span className="help-modal__key">N</span>
+                <span className="help-modal__desc">Reset Scale</span>
+              </div>
+              <div className="help-modal__shortcut">
+                <span className="help-modal__key">ESC</span>
+                <span className="help-modal__desc">Close Help</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       
       <div
         ref={containerRef}
         className={`container ${isFullscreen ? "fullscreen" : ""}`}
+        style={{ "--ui-scale": uiScale } as React.CSSProperties}
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         onMouseUp={handleMouseUp}
       >
+        <Toaster
+          position="bottom-center"
+          toastOptions={{ 
+            duration: 800,
+          }}
+        />
+
         {!isFullscreen && (
           <button
             className={`scroll-top-button ${selectedIndex > 0 ? "show" : ""}`}
@@ -276,9 +495,9 @@ function App() {
           </button>
         )}
 
-        <div className="labelBox">
+        <div className="container__labelBox">
           <div
-            className={`label clickable ${
+            className={`container__label clickable ${
               selectedIndex === 0 ? "disabled" : ""
             }`}
             onClick={selectedIndex !== 0 ? moveUp : undefined}
@@ -286,10 +505,10 @@ function App() {
             이전
           </div>
 
-          <div className="label">현재</div>
+          <div className="container__label">현재</div>
 
           <div
-            className={`label clickable ${
+            className={`container__label clickable ${
               selectedIndex === people.length - 1 ? "disabled" : ""
             }`}
             onClick={
@@ -300,15 +519,17 @@ function App() {
           </div>
         </div>
 
-        <div className="window">
+        <div className="container__window">
           <div
-            className="click-zone up"
+            className="container__click-zone up"
             onClick={moveUp}
+            onMouseDown={(e) => {e.preventDefault();}}
           />
 
           <div
-            className="click-zone down"
+            className="container__click-zone down"
             onClick={moveDown}
+            onMouseDown={(e) => {e.preventDefault();}}
           />
 
           {people.map((person, index) => (
@@ -319,6 +540,7 @@ function App() {
               isActive={index === selectedIndex}
               distance={index - selectedIndex}
               isFullscreen={isFullscreen}
+              uiScale={uiScale}
             />
           ))}
           <div className="highlight" />

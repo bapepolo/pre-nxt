@@ -1,6 +1,9 @@
+const strokeWidth = 1.8;
+
+
 function MoonIcon() {
   return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
       <path d="M21 12.5A8.5 8.5 0 1111.5 3 6.5 6.5 0 0021 12.5z"/>
     </svg>
   );
@@ -8,7 +11,7 @@ function MoonIcon() {
 
 function SunIcon() {
   return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round">
       <circle cx="12" cy="12" r="4"/>
       <line x1="12" y1="2" x2="12" y2="5"/>
       <line x1="12" y1="19" x2="12" y2="22"/>
@@ -30,7 +33,7 @@ function SystemIcon() {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="2"
+      strokeWidth={strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round">
 
