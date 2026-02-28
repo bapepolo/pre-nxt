@@ -2,21 +2,27 @@ import { useEffect, useRef, useState } from 'react';
 import './App.css'
 import { getPeopleFromGoogle, getPeopleFromLocal, type DataSource } from './services/peopleService';
 import { CloseIcon, EnterIcon } from './icons/fullScreenIcon';
-import PickerItem from './Item';
+import PickerItem from './components/Item';
 import GoToTopIcon from './icons/goToTopIcon';
 import { useGoogleCsv } from './hooks/useGoogleCsv';
 import { loadPersistedState, useAppPersist } from './hooks/useAppPersist';
 import { MoonIcon, SunIcon, SystemIcon } from './icons/darkModeIcon';
 import toast, { Toaster } from 'react-hot-toast';
+import SearchInput from './components/searchInput';
+import SearchOverlay from './components/searchOverlay';
 
 function App() {
   const [people, setPeople] = useState<{id: string, name: string}[]>([]);
+  const [query, setQuery] = useState("");
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [showScale, setShowScale] = useState(false);
+  const [isSearchMode, setIsSearchMode] = useState(false);
   // const [selectedSheet, setSelectedSheet] = useState<string>("2024-02-26");
+  const startY = useRef<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const longPressTimer =useRef<number | null>(null);
   const scaleHideTimer = useRef<number | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   
   const persisted = loadPersistedState();
 
@@ -78,7 +84,26 @@ function App() {
     }
   };
 
-  const startY = useRef<number | null>(null);
+  // Search
+  const handleSearch = () => {
+    const trimmed = query.toLowerCase().trim();
+    if (!trimmed) return false;
+
+    const tokens = trimmed.split(/\s+/);
+
+    const foundIndex = people.findIndex((person) =>{
+      const searchable = `${person.id} ${person.name}`.toLowerCase();
+
+      return tokens.every(token => searchable.includes(token));
+    });
+
+    if (foundIndex !== -1) {
+      setSelectedIndex(foundIndex);
+      return true;
+    }
+
+    return false;
+  };
 
   // prevent index overflow
   const clampIndex = (index: number) => {
@@ -98,6 +123,32 @@ function App() {
   // keyboard
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
+      const isTyping =
+        document.activeElement instanceof HTMLInputElement ||
+        document.activeElement instanceof HTMLTextAreaElement;
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLocaleLowerCase() === "f") {
+        e.preventDefault();
+        if (isFullscreen) setIsSearchMode(prev => !prev);
+        else {
+          searchInputRef.current?.focus();
+          searchInputRef.current?.select();
+        }
+      }
+      
+      if (e.key === "Escape") {
+        if (
+          !isFullscreen &&
+          document.activeElement === searchInputRef.current
+        ) {
+          searchInputRef.current?.blur();
+          return;
+        }
+      }
+
+      if (isTyping) return;
+      if (isSearchMode) return;
+
       if (e.key === "ArrowUp") {
         e.preventDefault();
         moveUp();
@@ -114,33 +165,15 @@ function App() {
         e.preventDefault();
         moveDown();
       }
-      if (
-        e.key.toLowerCase() === "u" &&
-        !(e.target instanceof HTMLInputElement) &&
-        !(e.target instanceof HTMLTextAreaElement)
-      ) {
+      if (e.key.toLowerCase() === "u") {
         e.preventDefault();
         setSelectedIndex(0);
       }
-      if (
-        e.key.toLowerCase() === "f" &&
-        !(e.target instanceof HTMLInputElement) &&
-        !(e.target instanceof HTMLTextAreaElement)
-      ) {
-        toggleFullscreen();
-      }
-      if (
-        e.key.toLowerCase() === "d" &&
-        !(e.target instanceof HTMLInputElement) &&
-        !(e.target instanceof HTMLTextAreaElement)
-      ) {
-        toggleDarkMode();
-      }
+      if (e.key.toLowerCase() === "f" && !e.ctrlKey) toggleFullscreen();
+      if (e.key.toLowerCase() === "d") toggleDarkMode();
       if (
         isFullscreen &&
-        e.code === "Comma" &&
-        !(e.target instanceof HTMLInputElement) &&
-        !(e.target instanceof HTMLTextAreaElement)
+        e.code === "Comma"
       ) {
         setUiScale(prev => {
           const next = clampSlider(prev - 0.05);
@@ -150,9 +183,7 @@ function App() {
       }
       if (
         isFullscreen &&
-        e.code === "Period" &&
-        !(e.target instanceof HTMLInputElement) &&
-        !(e.target instanceof HTMLTextAreaElement)
+        e.code === "Period"
       ) {
         setUiScale(prev => {
           const next = clampSlider(prev + 0.05);
@@ -160,31 +191,19 @@ function App() {
           return next;
         });
       }
-      if (
-        e.key.toLowerCase() === "n" &&
-        !(e.target instanceof HTMLInputElement) &&
-        !(e.target instanceof HTMLTextAreaElement)
-      ) {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "0") {
         setUiScale(1);
         showScaleToast(1);
       }
-      if (
-        e.key.toLowerCase() === "h" &&
-        !(e.target instanceof HTMLInputElement) &&
-        !(e.target instanceof HTMLTextAreaElement)
-      ) {
-        setIsHelpOpen(true);
-      }
+      if (e.key.toLowerCase() === "h") setIsHelpOpen(true);
       if (
         isHelpOpen &&
-        e.code === "Escape"
-      ) {
-        setIsHelpOpen(false);
-      }
+        e.key === "Escape"
+      ) setIsHelpOpen(false); // 이거 왜 escape 안 먹힘?
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [people.length, selectedIndex, isFullscreen]);
+  }, [people.length, selectedIndex, isFullscreen, isSearchMode]);
 
   // mouse wheel
   const handleWheel = (e: React.WheelEvent) => {
@@ -219,7 +238,9 @@ function App() {
 
   useEffect(() => {
     const handler = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      const fullscreenElement = document.fullscreenElement;
+      setIsFullscreen(!!fullscreenElement);
+      if (!fullscreenElement) setIsSearchMode(false);
     };
 
     document.addEventListener("fullscreenchange", handler);
@@ -343,6 +364,13 @@ function App() {
             {error && <span className="error-text">{error}</span>}
           </div>
         )}
+
+        <SearchInput 
+          ref={searchInputRef}
+          query={query} 
+          onChange={setQuery}
+          onSubmit={handleSearch} 
+        />
       </div>
 
       <div className='panel right'>
@@ -485,6 +513,15 @@ function App() {
             duration: 800,
           }}
         />
+
+        {isSearchMode && (
+          <SearchOverlay
+            query={query}
+            setQuery={setQuery}
+            onSubmit={handleSearch}
+            onClose={() => setIsSearchMode(false)}
+          />
+        )}
 
         {!isFullscreen && (
           <button
