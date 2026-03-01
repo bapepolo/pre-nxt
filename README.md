@@ -9,9 +9,9 @@ cost**, and **clean theme-aware UI design**.
 
 ## 🌐 Live Demo
 
-Deployed on Vercel:
+Deployed on [nowhere]:
 
-👉 https://pre-nxt.vercel.app/
+👉 'the linlk is not avaliable via RLS problem.'
 
 ------------------------------------------------------------------------
 
