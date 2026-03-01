@@ -11,6 +11,7 @@ import { MoonIcon, SunIcon, SystemIcon } from './icons/darkModeIcon';
 import toast, { Toaster } from 'react-hot-toast';
 import SearchInput from './components/SearchInput';
 import SearchOverlay from './components/SearchOverlay';
+import { useWakeLock } from './hooks/useWakeLock';
 
 function App() {
   const [people, setPeople] = useState<{id: string, name: string}[]>([]);
@@ -414,6 +415,8 @@ function App() {
     document.addEventListener("fullscreenchange", handler);
     return () => document.removeEventListener("fullscreenchange", handler);
   }, []);
+
+  useWakeLock(isFullscreen);
 
 
   // Scale UI
