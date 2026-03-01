@@ -58,6 +58,10 @@ body.dark {
   text-align: center;
 }
 
+.hide-cursor {
+  cursor: none !important;
+}
+
 .container {
   position: relative;
   height: 100%;

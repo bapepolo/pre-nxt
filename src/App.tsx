@@ -12,6 +12,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import SearchInput from './components/SearchInput';
 import SearchOverlay from './components/SearchOverlay';
 import { useWakeLock } from './hooks/useWakeLock';
+import { useAutoHideCursor } from './hooks/useAutoHideCursor';
 
 function App() {
   const [people, setPeople] = useState<{id: string, name: string}[]>([]);
@@ -417,6 +418,7 @@ function App() {
   }, []);
 
   useWakeLock(isFullscreen);
+  useAutoHideCursor(isFullscreen, 2000);
 
 
   // Scale UI
