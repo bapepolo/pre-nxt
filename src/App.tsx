@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import './App.css'
+import { supabase } from './lib/supabase'
 import { getPeopleFromGoogle, getPeopleFromLocal, type DataSource } from './services/peopleService';
 import { CloseIcon, EnterIcon } from './icons/fullScreenIcon';
 import PickerItem from './components/Item';
@@ -8,8 +9,8 @@ import { useGoogleCsv } from './hooks/useGoogleCsv';
 import { loadPersistedState, useAppPersist } from './hooks/useAppPersist';
 import { MoonIcon, SunIcon, SystemIcon } from './icons/darkModeIcon';
 import toast, { Toaster } from 'react-hot-toast';
-import SearchInput from './components/searchInput';
-import SearchOverlay from './components/searchOverlay';
+import SearchInput from './components/SearchInput';
+import SearchOverlay from './components/SearchOverlay';
 
 function App() {
   const [people, setPeople] = useState<{id: string, name: string}[]>([]);
@@ -48,6 +49,7 @@ function App() {
   const [selectedIndex, setSelectedIndex] = useState(
     persisted?.selectedIndex ?? 0
   );
+  const [remoteIndex, setRemoteIndex] = useState<number | null>(null)
 
   const {
     url: googleUrl,
@@ -56,6 +58,7 @@ function App() {
     isLoading,
     load
   } = useGoogleCsv(persisted?.googleUrl ?? "");
+  const [remoteGoogleUrl, setRemoteGoogleUrl] = useState<string | null>(null)
 
   useAppPersist({
     dataSource,
@@ -66,6 +69,171 @@ function App() {
     useSystemTheme,
     selectedIndex
   });
+
+  // Connect DB
+  useEffect(() => {
+    console.log("Supabase connected:", supabase)
+  }, [])
+
+  const [roomId, setRoomId] = useState<string | null>(null);
+  const [clientId] = useState(() =>
+    crypto.randomUUID().slice(0, 8)
+  );
+  // const [hostId, setHostId] = useState<string | null>(null);
+
+  // const isHost = hostId === clientId;
+
+  const getRoomFromUrl = () => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("room");
+  };
+
+  useEffect(() => {
+    let room = getRoomFromUrl()
+
+    if (!room) {
+      // room 없으면 자동 생성
+      room = crypto.randomUUID().slice(0, 8)
+
+      const newUrl = `${window.location.origin}?room=${room}`
+      window.history.replaceState({}, "", newUrl)
+    }
+
+    setRoomId(room)
+  }, [])
+
+  useEffect(() => {
+    if (!roomId) return;
+
+    const initRoom = async () => {
+      // 1. room 존재하는지 확인
+      const { data, error } = await supabase
+        .from("sessions")
+        .select("*")
+        .eq("room_id", roomId)
+
+      if (error) {
+        console.error("Room fetch error:", error)
+        return
+      }
+
+      // 2. 없으면 생성
+      if (!data || data.length === 0) {
+        console.log("Room not found. Creating new room...")
+
+        const { error: insertError } = await supabase
+          .from("sessions")
+          .insert({
+            room_id: roomId,
+            selected_index: 0,
+            sheet_url: null,
+            host_id: clientId,
+          })
+
+        if (insertError) {
+          console.error("Room creation error:", insertError);
+        } else {
+          console.log("Room created.");
+          // setHostId(clientId);
+        }
+      } else {
+        const room = data[0];
+        console.log("Room found:", room);
+        
+        // setHostId(room.host_id ?? null);
+
+        // host가 아직 없으면 내가 차지
+        if (!room.host_id) {
+          await supabase
+            .from("sessions")
+            .update({ host_id: clientId })
+            .eq("room_id", roomId);
+
+          // setHostId(clientId);
+        }
+        
+        // DB 값으로 초기화        
+        setRemoteIndex(room.selected_index ?? 0);
+        setSelectedIndex(room.selected_index ?? 0);
+
+        setRemoteGoogleUrl(room.sheet_url ?? null);
+        setGoogleUrl(room.sheet_url ?? null);
+      }
+    }
+
+    initRoom()
+  }, [roomId]);
+
+  useEffect(() => {
+    // if (!isHost) return;
+    if (!roomId) return;
+
+    if (remoteIndex === null) return;
+    if (selectedIndex === remoteIndex) return;
+
+    const updateIndex = async () => {
+      await supabase
+        .from("sessions")
+        .update({ selected_index: selectedIndex })
+        .eq("room_id", roomId);
+    };
+
+    updateIndex();
+  }, [selectedIndex, roomId]);
+
+  useEffect(() => {
+    // if (!isHost) return;
+    if (!roomId) return;
+
+    if (remoteGoogleUrl === null && googleUrl === null) return
+    if (googleUrl === remoteGoogleUrl) return
+
+    const updateSheetUrl = async () => {
+      await supabase
+        .from("sessions")
+        .update({ sheet_url: googleUrl })
+        .eq("room_id", roomId)
+    }
+
+    updateSheetUrl()
+  }, [googleUrl, roomId])
+
+  // Realtime subscription
+  useEffect(() => {
+    if (!roomId) return;
+
+    const channel = supabase
+      .channel(`room-${roomId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "sessions",
+          filter: `room_id=eq.${roomId}`,
+        },
+        (payload) => {
+          console.log("Realtime update received:", payload);
+
+          const newIndex = payload.new.selected_index;
+          const newGoogleUrl = payload.new.sheet_url;
+
+          setRemoteIndex(newIndex);
+          setSelectedIndex(newIndex);
+
+          setRemoteGoogleUrl(newGoogleUrl);
+          setGoogleUrl(newGoogleUrl);
+        }
+      )
+      .subscribe((status) => {
+        console.log("Realtime status:", status);
+      })
+      
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [roomId])
 
   // Data fetch
   useEffect(() => {
